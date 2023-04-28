@@ -21,11 +21,12 @@ public class DiaryController {
 
     private final DiaryService diaryService;
 
-    @Operation(summary = "일기 텍스트와 날씨를 이용해 DB에 일기 저장",description = "Request dto 를 작성해 작동하도록 해보았습니다.")
+    @Operation(summary = "일기 텍스트와 날씨를 이용해 DB에 일기 저장")
     @PostMapping("/create/diary")
-    public void createDiary(@RequestBody @Valid  CreatDiary.Request request) {
+    public void createDiary(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+            ,@RequestBody @Valid  String text) {
 
-        diaryService.createDiary(request);
+        diaryService.createDiary(date,text);
 
     }
 

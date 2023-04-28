@@ -4,7 +4,6 @@ import com.zxcv5595.weather.Exception.DiaryException;
 import com.zxcv5595.weather.WeatherApplication;
 import com.zxcv5595.weather.domain.DateWeather;
 import com.zxcv5595.weather.domain.Diary;
-import com.zxcv5595.weather.dto.CreatDiary;
 import com.zxcv5595.weather.dto.DiaryDto;
 import com.zxcv5595.weather.repository.DateWeatherRepository;
 import com.zxcv5595.weather.repository.DiaryRepository;
@@ -50,29 +49,29 @@ public class DiaryService {
     }
 
     @Transactional
-    public void createDiary(CreatDiary.Request request) {
+    public void createDiary(LocalDate date, String text) {
 
         logger.info("start to creat diary");
 
-        if(request.getDate().isAfter(LocalDate.ofYearDay(3050,1)))
-        {
-            throw  new DiaryException(ErrorCode.INVALID_DATE);
+        if (date.isAfter(LocalDate.ofYearDay(3050, 1))) {
+            throw new DiaryException(ErrorCode.INVALID_DATE);
         }
 
-        DateWeather dateWeather = getDateWeather(request.getDate());
+
+        DateWeather dateWeather = getDateWeather(date);
 
         //파싱한 데이터 db에 넣기
         diaryRepository.save(Diary.builder()
                 .temperature(dateWeather.getTemperature())
                 .icon(dateWeather.getIcon())
                 .weather(dateWeather.getWeather())
-                .date(request.getDate())
-                .text(request.getText())
+                .date(date)
+                .text(text)
                 .build());
         logger.info("end to creat diary");
     }
 
-    private DateWeather getDateWeather(LocalDate date) {
+     DateWeather getDateWeather(LocalDate date) {
         List<DateWeather> dateWeatherListFromDB = dateWeatherRepository.findAllByDate(date);
         if (dateWeatherListFromDB.size() == 0) {
             return getWeatherFromApi();
@@ -81,7 +80,7 @@ public class DiaryService {
         }
     }
 
-    private String getWeatherApi() {
+    String getWeatherApi() {
         String apiUrl = "https://api.openweathermap.org/data/2.5/weather?q=seoul&appid=" + apiKey;
         try {
             URL url = new URL(apiUrl);
@@ -112,10 +111,12 @@ public class DiaryService {
     }
 
     private DateWeather getWeatherFromApi() {
-
         String weatherData = getWeatherApi();
 
         Map<String, Object> parsedWeather = parseWeather(weatherData);
+        if (parsedWeather.isEmpty()) {
+            return DateWeather.builder().build();
+        }
 
         return DateWeather.builder()
                 .date(LocalDate.now())
@@ -123,10 +124,9 @@ public class DiaryService {
                 .weather(parsedWeather.get("main").toString())
                 .temperature((Double) parsedWeather.get("temp"))
                 .build();
-
     }
 
-    private Map<String, Object> parseWeather(String jsonString) {
+    Map<String, Object> parseWeather(String jsonString) {
         JSONParser jsonParser = new JSONParser();
         JSONObject jsonObject;
 
@@ -137,12 +137,19 @@ public class DiaryService {
         }
 
         Map<String, Object> resultMap = new HashMap<>();
-        JSONArray weatherArray = (JSONArray) jsonObject.get("weather");
-        JSONObject weatherData = (JSONObject) weatherArray.get(0);
-        resultMap.put("main", weatherData.get("main"));
-        resultMap.put("icon", weatherData.get("icon"));
-        JSONObject mainData = (JSONObject) jsonObject.get("main");
-        resultMap.put("temp", mainData.get("temp"));
+        try {
+            JSONArray weatherArray = (JSONArray) jsonObject.get("weather");
+            JSONObject weatherData = (JSONObject) weatherArray.get(0);
+            resultMap.put("main", weatherData.get("main"));
+            resultMap.put("icon", weatherData.get("icon"));
+            JSONObject mainData = (JSONObject) jsonObject.get("main");
+            resultMap.put("temp", mainData.get("temp"));
+        }catch (NullPointerException e){
+            return resultMap;
+        }
+
+
+
         return resultMap;
 
 
@@ -150,9 +157,8 @@ public class DiaryService {
 
     @Transactional(readOnly = true)
     public List<DiaryDto> readDiary(LocalDate date) {
-        if(date.isAfter(LocalDate.ofYearDay(3050,1)))
-        {
-            throw  new DiaryException(ErrorCode.INVALID_DATE);
+        if (date.isAfter(LocalDate.ofYearDay(3050, 1))) {
+            throw new DiaryException(ErrorCode.INVALID_DATE);
         }
         List<Diary> diaries = diaryRepository.findAllByDate(date);
 
